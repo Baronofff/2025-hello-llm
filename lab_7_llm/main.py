@@ -227,26 +227,20 @@ class LLMPipeline(AbstractLLMPipeline):
         dataloader = DataLoader(
             self._dataset,
             batch_size=self._batch_size,
-            shuffle=False,
-            collate_fn=lambda batch: (
-                [item[0] for item in batch],
-                [item[1] for item in batch]
-            )
+            collate_fn=lambda batch: list(zip(*batch))
         )
 
-        for sources, targets_batch in dataloader:
-            batch_predictions = self._infer_batch(sources)
+        for batch in dataloader:
+            inputs_for_infer = [(s,) for s in batch[0]]
+            batch_predictions = self._infer_batch(inputs_for_infer)
+
             predictions.extend(batch_predictions)
-            targets.extend(targets_batch)
+            targets.extend(batch[1])
 
         result_df = pd.DataFrame({
             ColumnNames.TARGET.value: targets,
             ColumnNames.PREDICTION.value: predictions
         })
-
-        output_path = Path(__file__).parent / "dist" / "predictions.csv"
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        result_df.to_csv(output_path, index=False)
 
         return result_df
 
