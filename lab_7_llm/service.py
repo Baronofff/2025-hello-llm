@@ -96,13 +96,15 @@ async def infer(query: Query) -> Dict[str, str]:
 
         pred_list = []
         if prediction_str.startswith("[") and prediction_str.endswith("]"):
-            content = prediction_str[1:-1].strip()
-            if content:
-                pred_list = [
-                    int(x.strip()) for x in content.split(",") if x.strip()
-                ]
+            if len(prediction_str) >= 3:
+                content = prediction_str[1:-1].strip()
+                if content:
+                    pred_list = [
+                        int(x.strip()) for x in content.split(",") if x.strip()
+                    ]
+        else:
+            return {"infer": f"Unexpected format: {prediction_str}"}
 
-        # Safely access model config
         model_config = getattr(pipeline, "_model", None)
         id2label = {}
         if model_config and hasattr(model_config, "config"):
