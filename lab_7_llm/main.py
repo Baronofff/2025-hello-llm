@@ -5,7 +5,7 @@ Working with Large Language Models.
 """
 
 from pathlib import Path
-from typing import cast, Iterable, Sequence, List, Union
+from typing import cast, Iterable, List, Sequence
 
 import evaluate
 import numpy as np
