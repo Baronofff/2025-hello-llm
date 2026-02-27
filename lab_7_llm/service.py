@@ -88,20 +88,16 @@ async def infer(query: Query) -> Dict[str, str]:
 
         prediction_str = pipeline.infer_sample(sample)
 
-        if not prediction_str or prediction_str == "None":
-            return {"infer": "No entities found"}
-
-        if not isinstance(prediction_str, str):
-            return {"infer": "Invalid prediction format"}
+        if prediction_str is None:
+            return {"infer": "No prediction generated"}
 
         pred_list = []
         if prediction_str.startswith("[") and prediction_str.endswith("]"):
             if len(prediction_str) >= 3:
                 content = prediction_str[1:-1].strip()
-                if content:
-                    pred_list = [
-                        int(x.strip()) for x in content.split(",") if x.strip()
-                    ]
+                pred_list = [
+                    int(x.strip()) for x in content.split(",") if x.strip()
+                ]
         else:
             return {"infer": f"Unexpected format: {prediction_str}"}
 

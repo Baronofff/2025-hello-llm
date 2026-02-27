@@ -463,7 +463,7 @@ class TaskEvaluator(AbstractTaskEvaluator):
 
     def _compute_accuracy(
         self,
-        metric_evaluate: Any,
+        metric_evaluate: Dict[str, float],
         predictions: List[List[int]],
         targets: List[List[int]]
     ) -> Dict[str, float]:
