@@ -1,6 +1,7 @@
 """
 Web service for model inference.
 """
+
 # pylint: disable=too-few-public-methods
 from pathlib import Path
 from typing import Tuple
