@@ -3,8 +3,9 @@ Laboratory work.
 
 Working with Large Language Models.
 """
+
 from pathlib import Path
-from typing import Iterable, Sequence
+from typing import cast, Iterable, Sequence, List, Union
 
 import evaluate
 import numpy as np
@@ -37,9 +38,7 @@ class RawDataImporter(AbstractRawDataImporter):
         Raises:
             TypeError: In case of downloaded dataset is not pd.DataFrame
         """
-        self._raw_data = load_dataset(
-            self._hf_name, split="val_en"
-        ).to_pandas()
+        self._raw_data = load_dataset(self._hf_name, split="val_en").to_pandas()
 
         if not isinstance(self._raw_data, pd.DataFrame):
             raise TypeError("Downloaded dataset is not pd.DataFrame")
@@ -68,27 +67,21 @@ class RawDataPreprocessor(AbstractRawDataPreprocessor):
             }
 
         df = self._raw_data.copy()
-        df['tokens_tuple'] = df['tokens'].apply(tuple)
+        df["tokens_tuple"] = df["tokens"].apply(tuple)
 
         df_clean = df.dropna()
         if len(df_clean) > 0:
-            lengths = df_clean['tokens'].apply(len)
+            lengths = df_clean["tokens"].apply(len)
         else:
             lengths = pd.Series([0])
 
         return {
             "dataset_number_of_samples": len(self._raw_data),
             "dataset_columns": len(self._raw_data.columns),
-            "dataset_duplicates": int(
-                df.duplicated(subset=['tokens_tuple']).sum()
-            ),
-            "dataset_empty_rows": int(
-                self._raw_data.isna().any(axis=1).sum()
-            ),
-            "dataset_sample_min_len": int(lengths.min()) if len(
-                lengths) > 0 else 0,
-            "dataset_sample_max_len": int(lengths.max()) if len(
-                lengths) > 0 else 0,
+            "dataset_duplicates": int(df.duplicated(subset=["tokens_tuple"]).sum()),
+            "dataset_empty_rows": int(self._raw_data.isna().any(axis=1).sum()),
+            "dataset_sample_min_len": int(lengths.min()) if len(lengths) > 0 else 0,
+            "dataset_sample_max_len": int(lengths.max()) if len(lengths) > 0 else 0,
         }
 
     @report_time
@@ -96,10 +89,9 @@ class RawDataPreprocessor(AbstractRawDataPreprocessor):
         """
         Apply preprocessing transformations to the raw dataset.
         """
-        self._data = self._raw_data.rename(columns={
-            'tokens': ColumnNames.SOURCE.value,
-            'ner_tags': ColumnNames.TARGET.value
-        }).reset_index(drop=True)
+        self._data = self._raw_data.rename(
+            columns={"tokens": ColumnNames.SOURCE.value, "ner_tags": ColumnNames.TARGET.value}
+        ).reset_index(drop=True)
 
 
 class TaskDataset(Dataset):
@@ -163,12 +155,7 @@ class LLMPipeline(AbstractLLMPipeline):
     """
 
     def __init__(
-        self,
-        model_name: str,
-        dataset: TaskDataset,
-        max_length: int,
-        batch_size: int,
-        device: str
+        self, model_name: str, dataset: TaskDataset, max_length: int, batch_size: int, device: str
     ) -> None:
         """
         Initialize an instance.
@@ -180,6 +167,9 @@ class LLMPipeline(AbstractLLMPipeline):
             batch_size (int): The size of the batch inside DataLoader
             device (str): The device for inference
         """
+        # Fix W0231: Call parent class constructor
+        super().__init__(model_name, dataset, max_length, batch_size, device)
+
         self._model_name = model_name
         self._model = BertForTokenClassification.from_pretrained(model_name)
         self._tokenizer = AutoTokenizer.from_pretrained(model_name)
@@ -199,14 +189,12 @@ class LLMPipeline(AbstractLLMPipeline):
         if not isinstance(self._model, torch.nn.Module):
             return {}
         config = self._model.config
-        ids = torch.ones(
-            1, config.max_position_embeddings, dtype=torch.long
-        )
+        ids = torch.ones(1, cast(int, config.max_position_embeddings), dtype=torch.long)
         result = summary(
             self._model,
             input_data={"input_ids": ids, "attention_mask": ids},
             device=self._device,
-            verbose=0
+            verbose=0,
         )
         return {
             "input_shape": {
@@ -250,9 +238,7 @@ class LLMPipeline(AbstractLLMPipeline):
         targets = []
 
         dataloader = DataLoader(
-            self._dataset,
-            batch_size=self._batch_size,
-            collate_fn=lambda batch: list(zip(*batch))
+            self._dataset, batch_size=self._batch_size, collate_fn=lambda batch: list(zip(*batch))
         )
 
         for batch in dataloader:
@@ -262,18 +248,14 @@ class LLMPipeline(AbstractLLMPipeline):
             predictions.extend(batch_predictions)
             targets.extend(batch[1])
 
-        result_df = pd.DataFrame({
-            ColumnNames.TARGET.value: targets,
-            ColumnNames.PREDICTION.value: predictions
-        })
+        result_df = pd.DataFrame(
+            {ColumnNames.TARGET.value: targets, ColumnNames.PREDICTION.value: predictions}
+        )
 
         return result_df
 
     @torch.no_grad()
-    def _infer_batch(
-            self,
-            sample_batch: Sequence[tuple[str, ...]]
-    ) -> list[str]:
+    def _infer_batch(self, sample_batch: Sequence[tuple[str, ...]]) -> list[str]:
         """
         Infer model on a single batch.
 
@@ -286,6 +268,32 @@ class LLMPipeline(AbstractLLMPipeline):
         if self._model is None:
             return []
 
+        inputs = self._prepare_inputs_for_batch(sample_batch)
+
+        ids = self._tokenizer(
+            inputs,
+            is_split_into_words=True,
+            padding=True,
+            truncation=True,
+            max_length=self._max_length,
+            return_tensors="pt",
+        ).to(self._device)
+
+        outputs = self._model(**ids)
+        predictions = torch.argmax(outputs.logits, dim=-1)
+
+        return self._process_predictions(predictions, ids)
+
+    def _prepare_inputs_for_batch(self, sample_batch: Sequence[tuple[str, ...]]) -> List[List[str]]:
+        """
+        Prepare inputs for the batch.
+
+        Args:
+            sample_batch: Batch to process
+
+        Returns:
+            List of token lists
+        """
         inputs = []
         for sample in sample_batch:
             if isinstance(sample, (tuple, list)):
@@ -301,19 +309,19 @@ class LLMPipeline(AbstractLLMPipeline):
                 inputs.append([str(t) for t in token_data])
             else:
                 inputs.append([str(token_data)])
+        return inputs
 
-        ids = self._tokenizer(
-            inputs,
-            is_split_into_words=True,
-            padding=True,
-            truncation=True,
-            max_length=self._max_length,
-            return_tensors="pt"
-        ).to(self._device)
+    def _process_predictions(self, predictions: torch.Tensor, ids) -> List[str]:
+        """
+        Process model predictions.
 
-        outputs = self._model(**ids)
-        predictions = torch.argmax(outputs.logits, dim=-1)
+        Args:
+            predictions: Model predictions tensor
+            ids: Tokenized inputs
 
+        Returns:
+            List of processed predictions as strings
+        """
         final_predictions = []
         for i, prediction in enumerate(predictions):
             word_ids = ids.word_ids(batch_index=i)
@@ -347,6 +355,8 @@ class TaskEvaluator(AbstractTaskEvaluator):
             data_path (pathlib.Path): Path to predictions
             metrics (Iterable[Metrics]): List of metrics to check
         """
+        super().__init__(data_path, metrics)
+
         self._data_path = data_path
         self._metrics = metrics
 
@@ -367,23 +377,8 @@ class TaskEvaluator(AbstractTaskEvaluator):
             p_str = str(row[ColumnNames.PREDICTION.value])
             t_str = str(row[ColumnNames.TARGET.value])
 
-            def parse_list_string(list_str: str) -> list:
-                if not list_str or not list_str.startswith('['):
-                    return []
-
-                content = list_str.strip('[]').strip()
-                if not content:
-                    return []
-
-                if ',' in content:
-                    return [
-                        int(x.strip()) for x in content.split(',') if x.strip()
-                    ]
-                else:
-                    return [int(x) for x in content.split() if x.strip()]
-
-            p_list = parse_list_string(p_str)
-            t_list = parse_list_string(t_str)
+            p_list = self._parse_list_string(p_str)
+            t_list = self._parse_list_string(t_str)
 
             all_predictions.append(p_list)
             all_targets.append(t_list)
@@ -393,31 +388,61 @@ class TaskEvaluator(AbstractTaskEvaluator):
         for metric in self._metrics:
             metric_evaluate = evaluate.load(str(metric))
 
-            if str(metric) == 'accuracy':
-                flat_predictions = []
-                flat_targets = []
-
-                for pred_list, target_list in zip(
-                    all_predictions, all_targets
-                ):
-                    if pred_list and target_list:
-                        min_len = min(len(pred_list), len(target_list))
-                        flat_predictions.extend(pred_list[:min_len])
-                        flat_targets.extend(target_list[:min_len])
-
-                if flat_predictions:
-                    score = metric_evaluate.compute(
-                        predictions=flat_predictions,
-                        references=flat_targets
-                    )
-                else:
-                    score = {str(metric): 0.0}
+            if str(metric) == "accuracy":
+                score = self._compute_accuracy(metric_evaluate, all_predictions, all_targets)
             else:
-                score = metric_evaluate.compute(
-                    predictions=all_predictions,
-                    references=all_targets
-                )
+                score = metric_evaluate.compute(predictions=all_predictions, references=all_targets)
 
             result[str(metric)] = score[str(metric)]
 
         return result
+
+    @staticmethod
+    def _parse_list_string(list_str: str) -> List[int]:
+        """
+        Parse string representation of list.
+
+        Args:
+            list_str: String containing list representation
+
+        Returns:
+            Parsed list of integers
+        """
+        if not list_str or not list_str.startswith("["):
+            return []
+
+        content = list_str.strip("[]").strip()
+        if not content:
+            return []
+
+        if "," in content:
+            return [int(x.strip()) for x in content.split(",") if x.strip()]
+        return [int(x) for x in content.split() if x.strip()]
+
+    def _compute_accuracy(self, metric_evaluate, predictions: List[List[int]],
+                          targets: List[List[int]]) -> dict:
+        """
+        Compute accuracy metric.
+
+        Args:
+            metric_evaluate: Accuracy metric
+            predictions: List of predictions
+            targets: List of targets
+
+        Returns:
+            Accuracy score
+        """
+        flat_predictions = []
+        flat_targets = []
+
+        for pred_list, target_list in zip(predictions, targets):
+            if pred_list and target_list:
+                min_len = min(len(pred_list), len(target_list))
+                flat_predictions.extend(pred_list[:min_len])
+                flat_targets.extend(target_list[:min_len])
+
+        if flat_predictions:
+            return metric_evaluate.compute(
+                predictions=flat_predictions, references=flat_targets
+            )
+        return {str(metric_evaluate): 0.0}

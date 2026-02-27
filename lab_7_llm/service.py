@@ -30,32 +30,25 @@ def init_application() -> Tuple[FastAPI, LLMPipeline]:
     batch_size = 64
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
-    dummy_data = pd.DataFrame({
-        'source': [['dummy']],
-        'target': [[0]]
-    })
+    dummy_data = pd.DataFrame({"source": [["dummy"]], "target": [[0]]})
     dataset = TaskDataset(dummy_data)
 
-    pipeline = LLMPipeline(
+    pipeline_instance = LLMPipeline(
         model_name=model_name,
         dataset=dataset,
         max_length=max_length,
         batch_size=batch_size,
-        device=device
+        device=device,
     )
 
-    app = FastAPI(title="NER Service")
+    app_instance = FastAPI(title="NER Service")
 
-    assets_path = Path(__file__).parent / "assets"
-    assets_path.mkdir(exist_ok=True)
+    assets_path_instance = Path(__file__).parent / "assets"
+    assets_path_instance.mkdir(exist_ok=True)
 
-    app.mount(
-        "/assets",
-        StaticFiles(directory=str(assets_path)),
-        name="assets"
-    )
+    app_instance.mount("/assets", StaticFiles(directory=str(assets_path_instance)), name="assets")
 
-    return app, pipeline
+    return app_instance, pipeline_instance
 
 
 app, pipeline = init_application()
@@ -66,6 +59,7 @@ templates = Jinja2Templates(directory=str(assets_path))
 @pydantic_dataclass
 class Query:
     """Query model for inference."""
+
     question: str
 
 
@@ -74,10 +68,7 @@ async def root(request: Request) -> HTMLResponse:
     """
     Root endpoint serving the main page.
     """
-    return templates.TemplateResponse(
-        "index.html",
-        {"request": request, "title": "NER Service"}
-    )
+    return templates.TemplateResponse("index.html", {"request": request, "title": "NER Service"})
 
 
 @app.post("/infer")
@@ -87,22 +78,23 @@ async def infer(query: Query) -> dict:
     """
     try:
         tokens = query.question.split()
-        sample = (tokens, "0")  # target-заглушка
+        sample = (tokens, "0")
 
         prediction_str = pipeline.infer_sample(sample)
 
         if not prediction_str or prediction_str == "None":
             return {"infer": "No entities found"}
 
+        if not isinstance(prediction_str, str):
+            return {"infer": "Invalid prediction format"}
+
         pred_list = []
-        if prediction_str.startswith('[') and prediction_str.endswith(']'):
+        if prediction_str.startswith("[") and prediction_str.endswith("]"):
             content = prediction_str[1:-1].strip()
             if content:
-                pred_list = [
-                    int(x.strip()) for x in content.split(',') if x.strip()
-                ]
+                pred_list = [int(x.strip()) for x in content.split(",") if x.strip()]
 
-        id2label = getattr(pipeline._model.config, 'id2label', {})
+        id2label = pipeline._model.config.id2label if hasattr(pipeline._model, 'config') else {}
         if not id2label and pred_list:
             max_id = max(pred_list)
             id2label = {i: str(i) for i in range(max_id + 1)}
@@ -110,19 +102,21 @@ async def infer(query: Query) -> dict:
         result_parts = []
         for token, pred_id in zip(tokens, pred_list):
             label = id2label.get(pred_id, str(pred_id))
-            if label == 'O' or pred_id == 0:
+            if label == "O" or pred_id == 0:
                 result_parts.append(token)
             else:
-                if label.startswith('B-') or label.startswith('I-'):
+                if label.startswith("B-") or label.startswith("I-"):
                     label = label[2:]
                 result_parts.append(f"{token}({label})")
 
         if len(pred_list) < len(tokens):
             result_parts.extend(tokens[len(pred_list):])
 
-        result_text = ' '.join(result_parts)
+        result_text = " ".join(result_parts)
 
         return {"infer": result_text}
 
-    except Exception as e:
+    except (ValueError, AttributeError, KeyError) as e:
         return {"infer": f"Error: {str(e)}"}
+    except Exception as e:
+        return {"infer": f"Unexpected error: {str(e)}"}
