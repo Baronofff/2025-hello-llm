@@ -1,0 +1,33 @@
+body {
+    font-family: Arial, sans-serif;
+    max-width: 600px;
+    margin: 50px auto;
+    padding: 20px;
+}
+.container {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+textarea {
+    width: 100%;
+    padding: 10px;
+    font-size: 16px;
+}
+button {
+    padding: 10px;
+    font-size: 16px;
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    cursor: pointer;
+}
+button:hover {
+    background-color: #45a049;
+}
+#output {
+    border: 1px solid #ccc;
+    padding: 10px;
+    min-height: 100px;
+    background: #f9f9f9;
+}
