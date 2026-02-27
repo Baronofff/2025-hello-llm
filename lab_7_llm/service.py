@@ -4,7 +4,7 @@ Web service for model inference.
 
 # pylint: disable=too-few-public-methods
 from pathlib import Path
-from typing import Tuple
+from typing import Dict, Tuple
 
 import pandas as pd
 import torch
@@ -46,7 +46,11 @@ def init_application() -> Tuple[FastAPI, LLMPipeline]:
     assets_path_instance = Path(__file__).parent / "assets"
     assets_path_instance.mkdir(exist_ok=True)
 
-    app_instance.mount("/assets", StaticFiles(directory=str(assets_path_instance)), name="assets")
+    app_instance.mount(
+        "/assets",
+        StaticFiles(directory=str(assets_path_instance)),
+        name="assets"
+    )
 
     return app_instance, pipeline_instance
 
@@ -68,11 +72,13 @@ async def root(request: Request) -> HTMLResponse:
     """
     Root endpoint serving the main page.
     """
-    return templates.TemplateResponse("index.html", {"request": request, "title": "NER Service"})
+    return templates.TemplateResponse(
+        "index.html", {"request": request, "title": "NER Service"}
+    )
 
 
 @app.post("/infer")
-async def infer(query: Query) -> dict:
+async def infer(query: Query) -> Dict[str, str]:
     """
     Main endpoint for model inference.
     """
@@ -92,9 +98,16 @@ async def infer(query: Query) -> dict:
         if prediction_str.startswith("[") and prediction_str.endswith("]"):
             content = prediction_str[1:-1].strip()
             if content:
-                pred_list = [int(x.strip()) for x in content.split(",") if x.strip()]
+                pred_list = [
+                    int(x.strip()) for x in content.split(",") if x.strip()
+                ]
 
-        id2label = pipeline._model.config.id2label if hasattr(pipeline._model, 'config') else {}
+        # Safely access model config
+        model_config = getattr(pipeline, "_model", None)
+        id2label = {}
+        if model_config and hasattr(model_config, "config"):
+            id2label = getattr(model_config.config, "id2label", {})
+
         if not id2label and pred_list:
             max_id = max(pred_list)
             id2label = {i: str(i) for i in range(max_id + 1)}
@@ -116,7 +129,5 @@ async def infer(query: Query) -> dict:
 
         return {"infer": result_text}
 
-    except (ValueError, AttributeError, KeyError) as e:
+    except (ValueError, AttributeError, KeyError, TypeError) as e:
         return {"infer": f"Error: {str(e)}"}
-    except Exception as e:
-        return {"infer": f"Unexpected error: {str(e)}"}
