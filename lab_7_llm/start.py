@@ -11,7 +11,8 @@ from lab_7_llm.main import (
     RawDataPreprocessor,
     report_time,
     TaskDataset,
-    TaskEvaluator, )
+    TaskEvaluator,
+)
 
 
 @report_time
@@ -53,12 +54,14 @@ def main() -> None:
     predictions.to_csv(predictions_path)
 
     evaluator = TaskEvaluator(
-        predictions_path, [Metrics(metric) for metric in settings.parameters.metrics]
+        predictions_path,
+        [Metrics(metric) for metric in settings.parameters.metrics]
     )
     result = evaluator.run()
     print(result)
 
     assert result is not None, "Demo does not work correctly"
+
 
 if __name__ == "__main__":
     main()

@@ -22,7 +22,8 @@ def init_application() -> Tuple[FastAPI, LLMPipeline]:
     Initialize core application.
 
     Returns:
-        tuple: tuple of two objects, instance of FastAPI server and LLMPipeline pipeline.
+        tuple: tuple of two objects, instance of FastAPI server and
+               LLMPipeline pipeline.
     """
     model_name = "Babelscape/wikineural-multilingual-ner"
     max_length = 120
@@ -48,7 +49,11 @@ def init_application() -> Tuple[FastAPI, LLMPipeline]:
     assets_path = Path(__file__).parent / "assets"
     assets_path.mkdir(exist_ok=True)
 
-    app.mount("/assets", StaticFiles(directory=str(assets_path)), name="assets")
+    app.mount(
+        "/assets",
+        StaticFiles(directory=str(assets_path)),
+        name="assets"
+    )
 
     return app, pipeline
 
@@ -93,11 +98,14 @@ async def infer(query: Query) -> dict:
         if prediction_str.startswith('[') and prediction_str.endswith(']'):
             content = prediction_str[1:-1].strip()
             if content:
-                pred_list = [int(x.strip()) for x in content.split(',') if x.strip()]
+                pred_list = [
+                    int(x.strip()) for x in content.split(',') if x.strip()
+                ]
 
         id2label = getattr(pipeline._model.config, 'id2label', {})
-        if not id2label:
-            id2label = {i: str(i) for i in range(max(pred_list)+1) if pred_list}
+        if not id2label and pred_list:
+            max_id = max(pred_list)
+            id2label = {i: str(i) for i in range(max_id + 1)}
 
         result_parts = []
         for token, pred_id in zip(tokens, pred_list):

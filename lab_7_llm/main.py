@@ -37,10 +37,13 @@ class RawDataImporter(AbstractRawDataImporter):
         Raises:
             TypeError: In case of downloaded dataset is not pd.DataFrame
         """
-        self._raw_data = load_dataset(self._hf_name, split="val_en").to_pandas()
+        self._raw_data = load_dataset(
+            self._hf_name, split="val_en"
+        ).to_pandas()
 
         if not isinstance(self._raw_data, pd.DataFrame):
             raise TypeError("Downloaded dataset is not pd.DataFrame")
+
 
 class RawDataPreprocessor(AbstractRawDataPreprocessor):
     """
@@ -68,15 +71,24 @@ class RawDataPreprocessor(AbstractRawDataPreprocessor):
         df['tokens_tuple'] = df['tokens'].apply(tuple)
 
         df_clean = df.dropna()
-        lengths = df_clean['tokens'].apply(len) if len(df_clean) > 0 else pd.Series([0])
+        if len(df_clean) > 0:
+            lengths = df_clean['tokens'].apply(len)
+        else:
+            lengths = pd.Series([0])
 
         return {
             "dataset_number_of_samples": len(self._raw_data),
             "dataset_columns": len(self._raw_data.columns),
-            "dataset_duplicates": int(df.duplicated(subset=['tokens_tuple']).sum()),
-            "dataset_empty_rows": int(self._raw_data.isna().any(axis=1).sum()),
-            "dataset_sample_min_len": int(lengths.min()) if len(lengths) > 0 else 0,
-            "dataset_sample_max_len": int(lengths.max()) if len(lengths) > 0 else 0,
+            "dataset_duplicates": int(
+                df.duplicated(subset=['tokens_tuple']).sum()
+            ),
+            "dataset_empty_rows": int(
+                self._raw_data.isna().any(axis=1).sum()
+            ),
+            "dataset_sample_min_len": int(lengths.min()) if len(
+                lengths) > 0 else 0,
+            "dataset_sample_max_len": int(lengths.max()) if len(
+                lengths) > 0 else 0,
         }
 
     @report_time
@@ -85,9 +97,10 @@ class RawDataPreprocessor(AbstractRawDataPreprocessor):
         Apply preprocessing transformations to the raw dataset.
         """
         self._data = self._raw_data.rename(columns={
-    'tokens': ColumnNames.SOURCE.value,
-    'ner_tags': ColumnNames.TARGET.value
+            'tokens': ColumnNames.SOURCE.value,
+            'ner_tags': ColumnNames.TARGET.value
         }).reset_index(drop=True)
+
 
 class TaskDataset(Dataset):
     """
@@ -150,7 +163,12 @@ class LLMPipeline(AbstractLLMPipeline):
     """
 
     def __init__(
-        self, model_name: str, dataset: TaskDataset, max_length: int, batch_size: int, device: str
+        self,
+        model_name: str,
+        dataset: TaskDataset,
+        max_length: int,
+        batch_size: int,
+        device: str
     ) -> None:
         """
         Initialize an instance.
@@ -181,8 +199,15 @@ class LLMPipeline(AbstractLLMPipeline):
         if not isinstance(self._model, torch.nn.Module):
             return {}
         config = self._model.config
-        ids = torch.ones(1, config.max_position_embeddings, dtype=torch.long)
-        result = summary(self._model, input_data={"input_ids": ids, "attention_mask": ids}, device=self._device, verbose=0)
+        ids = torch.ones(
+            1, config.max_position_embeddings, dtype=torch.long
+        )
+        result = summary(
+            self._model,
+            input_data={"input_ids": ids, "attention_mask": ids},
+            device=self._device,
+            verbose=0
+        )
         return {
             "input_shape": {
                 "input_ids": [1, config.max_position_embeddings],
@@ -202,7 +227,7 @@ class LLMPipeline(AbstractLLMPipeline):
         Infer model on a single sample.
 
         Args:
-            sample (tuple[str, ...]): The given sample for inference with model
+            sample (tuple[str, ...]): The given sample for inference
 
         Returns:
             str | None: A prediction
@@ -245,12 +270,15 @@ class LLMPipeline(AbstractLLMPipeline):
         return result_df
 
     @torch.no_grad()
-    def _infer_batch(self, sample_batch: Sequence[tuple[str, ...]]) -> list[str]:
+    def _infer_batch(
+            self,
+            sample_batch: Sequence[tuple[str, ...]]
+    ) -> list[str]:
         """
         Infer model on a single batch.
 
         Args:
-            sample_batch (Sequence[tuple[str, ...]]): Batch to infer the model
+            sample_batch (Sequence[tuple[str, ...]]): Batch to infer
 
         Returns:
             list[str]: Model predictions as strings
@@ -305,6 +333,7 @@ class LLMPipeline(AbstractLLMPipeline):
 
         return final_predictions
 
+
 class TaskEvaluator(AbstractTaskEvaluator):
     """
     A class that compares prediction quality using the specified metric.
@@ -323,10 +352,11 @@ class TaskEvaluator(AbstractTaskEvaluator):
 
     def run(self) -> dict:
         """
-        Evaluate the predictions against the references using the specified metric.
+        Evaluate the predictions against the references.
 
         Returns:
-            dict: A dictionary containing information about the calculated metric
+            dict: A dictionary containing information about the calculated
+                  metric
         """
         data = pd.read_csv(self._data_path)
 
@@ -346,7 +376,9 @@ class TaskEvaluator(AbstractTaskEvaluator):
                     return []
 
                 if ',' in content:
-                    return [int(x.strip()) for x in content.split(',') if x.strip()]
+                    return [
+                        int(x.strip()) for x in content.split(',') if x.strip()
+                    ]
                 else:
                     return [int(x) for x in content.split() if x.strip()]
 
@@ -365,7 +397,9 @@ class TaskEvaluator(AbstractTaskEvaluator):
                 flat_predictions = []
                 flat_targets = []
 
-                for pred_list, target_list in zip(all_predictions, all_targets):
+                for pred_list, target_list in zip(
+                    all_predictions, all_targets
+                ):
                     if pred_list and target_list:
                         min_len = min(len(pred_list), len(target_list))
                         flat_predictions.extend(pred_list[:min_len])
