@@ -55,8 +55,7 @@ def main() -> None:
     predictions.to_csv(predictions_path)
 
     evaluator = TaskEvaluator(
-        predictions_path,
-        [Metrics(metric) for metric in settings.parameters.metrics]
+        predictions_path, [Metrics(metric) for metric in settings.parameters.metrics]
     )
     result = evaluator.run()
     print(result)

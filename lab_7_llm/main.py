@@ -3,10 +3,11 @@ Laboratory work.
 
 Working with Large Language Models.
 """
+
 # pylint: disable=too-few-public-methods, undefined-variable, too-many-arguments, super-init-not-called
 
 from pathlib import Path
-from typing import Any, cast, Dict, Iterable, List, Sequence
+from typing import cast, Dict, Iterable, List, Sequence
 
 import evaluate
 import numpy as np
@@ -39,9 +40,7 @@ class RawDataImporter(AbstractRawDataImporter):
         Raises:
             TypeError: In case of downloaded dataset is not pd.DataFrame
         """
-        self._raw_data = load_dataset(
-            self._hf_name, split="val_en"
-        ).to_pandas()
+        self._raw_data = load_dataset(self._hf_name, split="val_en").to_pandas()
 
         if not isinstance(self._raw_data, pd.DataFrame):
             raise TypeError("Downloaded dataset is not pd.DataFrame")
@@ -81,20 +80,10 @@ class RawDataPreprocessor(AbstractRawDataPreprocessor):
         return {
             "dataset_number_of_samples": len(self._raw_data),
             "dataset_columns": len(self._raw_data.columns),
-            "dataset_duplicates": int(
-                df.duplicated(subset=["tokens_tuple"]).sum()
-            ),
-            "dataset_empty_rows": int(
-                self._raw_data.isna().any(
-                    axis=1
-                ).sum()
-            ),
-            "dataset_sample_min_len": int(
-                lengths.min()
-            ) if len(lengths) > 0 else 0,
-            "dataset_sample_max_len": int(
-                lengths.max()
-            ) if len(lengths) > 0 else 0,
+            "dataset_duplicates": int(df.duplicated(subset=["tokens_tuple"]).sum()),
+            "dataset_empty_rows": int(self._raw_data.isna().any(axis=1).sum()),
+            "dataset_sample_min_len": int(lengths.min()) if len(lengths) > 0 else 0,
+            "dataset_sample_max_len": int(lengths.max()) if len(lengths) > 0 else 0,
         }
 
     @report_time
@@ -103,10 +92,7 @@ class RawDataPreprocessor(AbstractRawDataPreprocessor):
         Apply preprocessing transformations to the raw dataset.
         """
         self._data = self._raw_data.rename(
-            columns={
-                "tokens": ColumnNames.SOURCE.value,
-                "ner_tags": ColumnNames.TARGET.value
-            }
+            columns={"tokens": ColumnNames.SOURCE.value, "ner_tags": ColumnNames.TARGET.value}
         ).reset_index(drop=True)
 
 
@@ -171,12 +157,7 @@ class LLMPipeline(AbstractLLMPipeline):
     """
 
     def __init__(
-        self,
-        model_name: str,
-        dataset: TaskDataset,
-        max_length: int,
-        batch_size: int,
-        device: str
+        self, model_name: str, dataset: TaskDataset, max_length: int, batch_size: int, device: str
     ) -> None:
         """
         Initialize an instance.
@@ -209,11 +190,7 @@ class LLMPipeline(AbstractLLMPipeline):
         if not isinstance(self._model, torch.nn.Module):
             return {}
         config = self._model.config
-        ids = torch.ones(
-            1,
-            cast(int, config.max_position_embeddings),
-            dtype=torch.long
-        )
+        ids = torch.ones(1, cast(int, config.max_position_embeddings), dtype=torch.long)
         result = summary(
             self._model,
             input_data={"input_ids": ids, "attention_mask": ids},
@@ -262,9 +239,7 @@ class LLMPipeline(AbstractLLMPipeline):
         targets = []
 
         dataloader = DataLoader(
-            self._dataset,
-            batch_size=self._batch_size,
-            collate_fn=lambda batch: list(zip(*batch))
+            self._dataset, batch_size=self._batch_size, collate_fn=lambda batch: list(zip(*batch))
         )
 
         for batch in dataloader:
@@ -275,19 +250,13 @@ class LLMPipeline(AbstractLLMPipeline):
             targets.extend(batch[1])
 
         result_df = pd.DataFrame(
-            {
-                ColumnNames.TARGET.value: targets,
-                ColumnNames.PREDICTION.value: predictions
-            }
+            {ColumnNames.TARGET.value: targets, ColumnNames.PREDICTION.value: predictions}
         )
 
         return result_df
 
     @torch.no_grad()
-    def _infer_batch(
-            self,
-            sample_batch: Sequence[tuple[str, ...]]
-    ) -> list[str]:
+    def _infer_batch(self, sample_batch: Sequence[tuple[str, ...]]) -> list[str]:
         """
         Infer model on a single batch.
 
@@ -316,9 +285,7 @@ class LLMPipeline(AbstractLLMPipeline):
 
         return self._process_predictions(predictions, ids)
 
-    def _prepare_inputs_for_batch(
-        self, sample_batch: Sequence[tuple[str, ...]]
-    ) -> List[List[str]]:
+    def _prepare_inputs_for_batch(self, sample_batch: Sequence[tuple[str, ...]]) -> List[List[str]]:
         """
         Prepare inputs for the batch.
 
@@ -345,9 +312,7 @@ class LLMPipeline(AbstractLLMPipeline):
                 inputs.append([str(token_data)])
         return inputs
 
-    def _process_predictions(
-        self, predictions: torch.Tensor, ids: BatchEncoding
-    ) -> List[str]:
+    def _process_predictions(self, predictions: torch.Tensor, ids: BatchEncoding) -> List[str]:
         """
         Process model predictions.
 
@@ -425,9 +390,7 @@ class TaskEvaluator(AbstractTaskEvaluator):
             metric_evaluate = evaluate.load(str(metric))
 
             if str(metric) == "accuracy":
-                score_dict = self._compute_accuracy(
-                    metric_evaluate, all_predictions, all_targets
-                )
+                score_dict = self._compute_accuracy(metric_evaluate, all_predictions, all_targets)
                 score = score_dict[str(metric)]
             else:
                 score_dict = metric_evaluate.compute(
@@ -465,7 +428,7 @@ class TaskEvaluator(AbstractTaskEvaluator):
         self,
         metric_evaluate: Dict[str, float],
         predictions: List[List[int]],
-        targets: List[List[int]]
+        targets: List[List[int]],
     ) -> Dict[str, float]:
         """
         Compute accuracy metric.
@@ -488,7 +451,5 @@ class TaskEvaluator(AbstractTaskEvaluator):
                 flat_targets.extend(target_list[:min_len])
 
         if flat_predictions:
-            return metric_evaluate.compute(
-                predictions=flat_predictions, references=flat_targets
-            )
+            return metric_evaluate.compute(predictions=flat_predictions, references=flat_targets)
         return {str(metric_evaluate): 0.0}

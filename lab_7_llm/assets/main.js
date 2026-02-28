@@ -1,19 +1,31 @@
-document.getElementById('submit-btn').addEventListener('click', async () => {
-    const text = document.getElementById('input-text').value.trim();
-    if (!text) {
-        document.getElementById('output').textContent = 'Please enter some text';
-        return;
-    }
-    document.getElementById('output').textContent = 'Processing...';
-    try {
-        const response = await fetch('/infer', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({question: text})
-        });
-        const data = await response.json();
-        document.getElementById('output').textContent = data.infer || 'No result';
-    } catch (error) {
-        document.getElementById('output').textContent = 'Error: ' + error;
-    }
+document.addEventListener('DOMContentLoaded', () => {
+    const btn = document.querySelector('button');
+    const result = document.getElementById('result');
+
+    btn.addEventListener('click', async () => {
+        const questionText = document.getElementById('question').value;
+        result.textContent = "Wait...";
+
+        try {
+            const response = await fetch('/infer', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    question: questionText,
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error(`Server Error: ${response.status}`);
+            }
+
+            const data = await response.json();
+            result.textContent = data.infer;
+        } catch (error) {
+            result.textContent = "Error";
+            console.error(error);
+        }
+    });
 });

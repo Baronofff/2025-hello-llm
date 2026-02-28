@@ -3,32 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ title }}</title>
-    <link rel="stylesheet" href="/assets/styles.css">
+    <title>QA Service</title>
+    <link href="{{ url_for('assets', path='/styles.css') }}" rel="stylesheet">
 </head>
 <body>
-    <div class="container">
-        <h1>Named Entity Recognition Service</h1>
-        <p>Enter text to identify named entities (persons, organizations, locations, etc.)</p>
-
-        <div class="input-section">
-            <textarea
-                id="input-text"
-                placeholder="Enter your text here..."
-                rows="4"
-            ></textarea>
-
-            <button id="submit-btn">Analyze Text</button>
-        </div>
-
-        <div class="output-section">
-            <h2>Result:</h2>
-            <div id="output" class="output-box">
-                Waiting for input...
-            </div>
-        </div>
+    <div>
+        <h1>Name Entity Recognition</h1>
+            <input type="text" id="question" placeholder="Your names">
+            <button type="button">Get Answer</button>
+            <p id="result">Your result</p>
     </div>
-
-    <script src="/assets/main.js"></script>
 </body>
+    <script src="{{ url_for('assets', path='/main.js') }}"></script>
 </html>
