@@ -379,8 +379,8 @@ class TaskEvaluator(AbstractTaskEvaluator):
             p_str = str(row[ColumnNames.PREDICTION.value])
             t_str = str(row[ColumnNames.TARGET.value])
 
-            p_list = self._parse_list_string(p_str)
-            t_list = self._parse_list_string(t_str)
+            p_list = [int(el) for el in p_str.strip("[]").replace(",", " ").split()]
+            t_list = [int(el) for el in t_str.strip("[]").replace(",", " ").split()]
 
             all_predictions.append(p_list)
             all_targets.append(t_list)
@@ -389,65 +389,15 @@ class TaskEvaluator(AbstractTaskEvaluator):
 
         for metric in self._metrics:
             metric_evaluate = evaluate.load(str(metric))
+            predictions = []
+            targets = []
 
-            if str(metric) == "accuracy":
-                score_dict = self._compute_accuracy(metric_evaluate, all_predictions, all_targets)
-                score = score_dict[str(metric)]
-            else:
-                score_dict = metric_evaluate.compute(
-                    predictions=all_predictions, references=all_targets
-                )
-                score = score_dict[str(metric)]
-
+            for prediction, target in zip(all_predictions, all_targets):
+                min_len = min(len(prediction), len(target))
+                predictions.extend(prediction[:min_len])
+                targets.extend(target[:min_len])
+            score_dict = metric_evaluate.compute(predictions=predictions, references=targets)
+            score = score_dict[str(metric)]
             result[str(metric)] = score
 
         return result
-
-    @staticmethod
-    def _parse_list_string(list_str: str) -> List[int]:
-        """
-        Parse string representation of list.
-
-        Args:
-            list_str: String containing list representation
-
-        Returns:
-            Parsed list of integers
-        """
-        if not list_str or not list_str.startswith("["):
-            return []
-
-        content = list_str.strip("[]").strip()
-        if not content:
-            return []
-
-        if "," in content:
-            return [int(x.strip()) for x in content.split(",") if x.strip()]
-        return [int(x) for x in content.split() if x.strip()]
-
-    def _compute_accuracy(
-        self,
-        metric_evaluate: EvaluationModule,
-        predictions: List[List[int]],
-        targets: List[List[int]],
-    ) -> Dict[str, float]:
-        """
-        Compute accuracy metric.
-
-        Args:
-            metric_evaluate: Accuracy metric
-            predictions: List of predictions
-            targets: List of targets
-
-        Returns:
-            Accuracy score
-        """
-        flat_predictions = []
-        flat_targets = []
-
-        for pred_list, target_list in zip(predictions, targets):
-            min_len = min(len(pred_list), len(target_list))
-            flat_predictions.extend(pred_list[:min_len])
-            flat_targets.extend(target_list[:min_len])
-
-        return metric_evaluate.compute(predictions=flat_predictions, references=flat_targets)
