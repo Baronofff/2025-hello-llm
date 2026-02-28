@@ -89,12 +89,7 @@ async def infer(query: Query) -> Dict[str, str]:
     Main endpoint for model inference.
     """
     result = pipeline.infer_sample((query.question,))
+    numbers = [int(num.strip()) for num in result.strip("[]").split(",") if num.strip()]
+    mapped_tags = [NER_TAG_MAPPING.get(num, "O") for num in numbers]
 
-    id2label = pipeline._model.config.id2label
-
-    numbers_str = result.strip("[]").split(",")
-    numbers = [int(num.strip()) for num in numbers_str if num.strip()]
-
-    mapped_tags = [id2label.get(num, f"Unknown({num})") for num in numbers]
-
-    return {"infer": str(mapped_tags), "raw_numbers": result}
+    return {"infer": str(mapped_tags)}

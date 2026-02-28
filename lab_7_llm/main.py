@@ -14,6 +14,7 @@ import numpy as np
 import pandas as pd
 import torch
 from datasets import load_dataset
+from evaluate import EvaluationModule
 from pandas import DataFrame
 from torch.utils.data import DataLoader, Dataset
 from torchinfo import summary
@@ -426,7 +427,7 @@ class TaskEvaluator(AbstractTaskEvaluator):
 
     def _compute_accuracy(
         self,
-        metric_evaluate: Dict[str, float],
+        metric_evaluate: EvaluationModule,
         predictions: List[List[int]],
         targets: List[List[int]],
     ) -> Dict[str, float]:
@@ -445,11 +446,8 @@ class TaskEvaluator(AbstractTaskEvaluator):
         flat_targets = []
 
         for pred_list, target_list in zip(predictions, targets):
-            if pred_list and target_list:
-                min_len = min(len(pred_list), len(target_list))
-                flat_predictions.extend(pred_list[:min_len])
-                flat_targets.extend(target_list[:min_len])
+            min_len = min(len(pred_list), len(target_list))
+            flat_predictions.extend(pred_list[:min_len])
+            flat_targets.extend(target_list[:min_len])
 
-        if flat_predictions:
-            return metric_evaluate.compute(predictions=flat_predictions, references=flat_targets)
-        return {str(metric_evaluate): 0.0}
+        return metric_evaluate.compute(predictions=flat_predictions, references=flat_targets)
