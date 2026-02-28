@@ -58,16 +58,6 @@ class RawDataPreprocessor(AbstractRawDataPreprocessor):
         Returns:
             dict: Dataset key properties
         """
-        if self._raw_data is None or len(self._raw_data) == 0:
-            return {
-                "dataset_number_of_samples": 0,
-                "dataset_columns": 0,
-                "dataset_duplicates": 0,
-                "dataset_empty_rows": 0,
-                "dataset_sample_min_len": 0,
-                "dataset_sample_max_len": 0,
-            }
-
         df = self._raw_data.copy()
         df["tokens_tuple"] = df["tokens"].apply(tuple)
 
