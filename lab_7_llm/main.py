@@ -7,14 +7,13 @@ Working with Large Language Models.
 # pylint: disable=too-few-public-methods, undefined-variable, too-many-arguments, super-init-not-called
 
 from pathlib import Path
-from typing import cast, Dict, Iterable, List, Sequence
+from typing import cast, Iterable, List, Sequence
 
 import evaluate
 import numpy as np
 import pandas as pd
 import torch
 from datasets import load_dataset
-from evaluate import EvaluationModule
 from pandas import DataFrame
 from torch.utils.data import DataLoader, Dataset
 from torchinfo import summary
@@ -379,16 +378,12 @@ class TaskEvaluator(AbstractTaskEvaluator):
             p_str = str(row[ColumnNames.PREDICTION.value])
             t_str = str(row[ColumnNames.TARGET.value])
 
-            p_list = [int(el) for el in p_str.strip("[]").replace(",", " ").split()]
-            t_list = [int(el) for el in t_str.strip("[]").replace(",", " ").split()]
-
-            all_predictions.append(p_list)
-            all_targets.append(t_list)
+            all_predictions.append([int(el) for el in p_str.strip("[]").replace(",", " ").split()])
+            all_targets.append([int(el) for el in t_str.strip("[]").replace(",", " ").split()])
 
         result = {}
 
         for metric in self._metrics:
-            metric_evaluate = evaluate.load(str(metric))
             predictions = []
             targets = []
 
@@ -396,7 +391,7 @@ class TaskEvaluator(AbstractTaskEvaluator):
                 min_len = min(len(prediction), len(target))
                 predictions.extend(prediction[:min_len])
                 targets.extend(target[:min_len])
-            score_dict = metric_evaluate.compute(predictions=predictions, references=targets)
+            score_dict = evaluate.load(str(metric)).compute(predictions=predictions, references=targets)
             score = score_dict[str(metric)]
             result[str(metric)] = score
 
