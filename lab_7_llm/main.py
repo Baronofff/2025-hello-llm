@@ -391,8 +391,10 @@ class TaskEvaluator(AbstractTaskEvaluator):
                 min_len = min(len(prediction), len(target))
                 predictions.extend(prediction[:min_len])
                 targets.extend(target[:min_len])
-            score_dict = evaluate.load(str(metric)).compute(predictions=predictions, references=targets)
-            score = score_dict[str(metric)]
-            result[str(metric)] = score
+            score_dict = evaluate.load(str(metric)).compute(
+                predictions=predictions,
+                references=targets
+            )
+            result[str(metric)] = score_dict[str(metric)]
 
         return result
