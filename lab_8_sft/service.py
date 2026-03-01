@@ -1,8 +1,6 @@
 """
 Web service for model inference.
 """
-
-import logging
 from pathlib import Path
 
 import pandas as pd
@@ -18,10 +16,7 @@ from lab_8_sft.main import LLMPipeline, TaskDataset
 # pylint: disable=too-few-public-methods
 
 
-
 MAIN_PATH = Path(__file__).parent
-
-logging.basicConfig(level=logging.INFO)
 
 
 class Query(BaseModel):
@@ -50,14 +45,10 @@ def init_application() -> tuple:
 
     finetuned_model_path = Path(__file__).parent / "dist" / model_name
     if finetuned_model_path.exists():
-        logging.info(f"Fine-tuned model found at {finetuned_model_path}")
         sft_pipeline = LLMPipeline(
             str(finetuned_model_path), dataset=dataset, max_length=120, batch_size=1, device="cpu"
         )
     else:
-        logging.warning(f"Fine-tuned model not found at {
-        finetuned_model_path
-        }, using base model as fallback")
         sft_pipeline = pipeline
     return fast_app, pipeline, sft_pipeline
 
@@ -86,9 +77,6 @@ def infer(query: Query) -> dict[str, str]:
     Process user query with LLM pipeline.
 
     """
-    model_used = "base" if query.use_base_model else "fine-tuned"
-    logging.info(f"Inference request - Model: {model_used}, Question: {query.question[:20]}...")
-
     if query.use_base_model:
         result = base_pipeline.infer_sample(query.question)
         output = f"base result: {result}"
